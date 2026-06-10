@@ -1,0 +1,90 @@
+/* ------------------------------------------------------------------ */
+/*  EchoState — Floating Badge                                        */
+/*  Injected as a content-script CSS so it can style our DOM nodes.   */
+/*  All selectors are namespaced with #echostate- to avoid collisions. */
+/* ------------------------------------------------------------------ */
+
+#echostate-root {
+  all: initial;
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  pointer-events: none; /* allow clicks to pass through the container */
+}
+#echostate-root * {
+  pointer-events: auto; /* re-enable on children */
+}
+
+/* --- Label (dot + text) --- */
+.echostate-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  cursor: default;
+}
+
+/* --- Status dot (shared base) --- */
+#echostate-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* --- Online: green glow --- */
+#echostate-dot.echostate-online {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+}
+
+/* --- Offline: gray --- */
+#echostate-dot.echostate-offline {
+  background-color: #a1a1aa;
+  box-shadow: none;
+}
+
+/* --- Label text --- */
+#echostate-text {
+  font-size: 10px;
+  font-weight: 500;
+  color: #a1a1aa;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+/* --- Inject button (shared base) --- */
+#echostate-btn {
+  display: inline-block;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* --- Active state --- */
+#echostate-btn.echostate-btn-active {
+  background-color: #27272a;
+  color: #fff;
+}
+#echostate-btn.echostate-btn-active:hover {
+  background-color: #3f3f46;
+}
+
+/* --- Disabled state --- */
+#echostate-btn.echostate-btn-disabled {
+  background-color: #e4e4e7;
+  color: #a1a1aa;
+  cursor: not-allowed;
+}

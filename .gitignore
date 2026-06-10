@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+api/node_modules/
+
+# Build outputs
+daemon/daemon
+daemon/echostate-daemon
+/tmp/echostate-daemon
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Environment
+.echo-state.md
+
+# Logs
+*.log

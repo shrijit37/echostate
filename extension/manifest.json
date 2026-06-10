@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "EchoState",
+  "version": "1.0.0",
+  "description": "Inject local workspace context into ChatGPT and Claude",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://claude.ai/*"
+      ],
+      "js": ["content.js"],
+      "css": ["style.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "http://localhost:9080/*"
+  ]
+}
