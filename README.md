@@ -176,6 +176,10 @@ For other MCP hosts, configure a **stdio** transport running the same command.
 
 > **Note:** The daemon must run from a project root containing `.echo-state.md` and `.git/`. It reads these to build the workspace state.
 
+## Agent Skill
+
+A formal agent skill definition is available in [skills/echostate.md](skills/echostate.md). This file can be used to teach other agents how to use EchoState effectively, including the "First Turn Rule" and best practices for context grounding.
+
 ## Project Structure
 
 ```
