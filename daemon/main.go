@@ -3,12 +3,18 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+)
+
+var (
+	version = "dev"
+	commit  = "unknown"
 )
 
 const (
@@ -18,7 +24,11 @@ const (
 	ollamaModel       = "llama3.2"
 )
 
+var mode = flag.String("mode", "http", `Server mode: "http" or "mcp"`)
+
 func main() {
+	flag.Parse()
+
 	pwd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("getwd: %v", err)
@@ -31,6 +41,17 @@ func main() {
 		log.Printf("initial refresh: %v", err)
 	}
 
+	switch *mode {
+	case "http":
+		runHTTP(state)
+	case "mcp":
+		runMCP(state)
+	default:
+		log.Fatalf("unknown mode %q; expected http or mcp", *mode)
+	}
+}
+
+func runHTTP(state *StateManager) {
 	// Start file watcher
 	watcher, err := NewWatcher(state, ".echo-state.md")
 	if err != nil {
@@ -55,7 +76,14 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
-
+	mux.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"version":"` + version + `","commit":"` + commit + `"}` + "\n"))
+	})
 	server := &http.Server{Addr: addr, Handler: mux}
 
 	go func() {

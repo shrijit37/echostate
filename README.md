@@ -1,13 +1,21 @@
 # EchoState
 
-Local-first, zero-cloud context bridge. Reads a local workspace state, maps the project tree, summarizes heavy context via a local LLM (Ollama), and securely serves the payload to a custom browser extension. The extension injects the context into ChatGPT and Claude web interfaces.
+[![CI](https://github.com/<your-org>/echostate/actions/workflows/ci.yml/badge.svg)](https://github.com/<your-org>/echostate/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/<your-org>/echostate)](https://github.com/<your-org>/echostate/releases)
+[![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)](https://go.dev)
+[![Node](https://img.shields.io/badge/Node-18+-339933?logo=node.js)](https://nodejs.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+**Local-first, zero-cloud context bridge.** EchoState reads your local workspace state, maps the project tree, summarizes heavy context via a local LLM (Ollama), and securely serves the payload to a custom browser extension that injects it into ChatGPT and Claude web interfaces.
+
+---
 
 ## Architecture
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌──────────────────┐
 │  Go Daemon  │────▶│  Node Relay  │────▶│  Browser Ext.    │
-│  :9081      │     │  :9080       │     │  (Plasmo/React)  │
+│  :9081      │     │  :9080       │     │  (Manifest V3)   │
 └─────────────┘     └──────────────┘     └──────────────────┘
        │                                        │
        ▼                                        ▼
@@ -17,17 +25,30 @@ Local-first, zero-cloud context bridge. Reads a local workspace state, maps the 
   Ollama (:11434)
 ```
 
+## Downloads
+
+Pre-built binaries and packages are available on the [Releases](https://github.com/<your-org>/echostate/releases) page.
+
+| Component | Platform | Format |
+|-----------|----------|--------|
+| **Daemon** | Linux amd64/arm64 | `.tar.gz` |
+| **Daemon** | macOS amd64/arm64 | `.tar.gz` |
+| **Daemon** | Windows amd64 | `.tar.gz` |
+| **Relay API** | Any (Node.js) | `.tar.gz` |
+| **Extension** | Chrome/Edge/Brave | `.zip` |
+| **Source** | — | `.tar.gz` |
+
 ## Prerequisites
 
-- **Go 1.21+** — for the daemon
+- **Go 1.21+** — to build the daemon from source
 - **Node.js 18+** — for the relay API
-- **Ollama** — optional, for context summarization (install: `curl -fsSL https://ollama.com/install.sh | sh`)
+- **Ollama** — optional, for context summarization (`curl -fsSL https://ollama.com/install.sh | sh`)
 
 ## Quick Start
 
 ### 1. Create your context file
 
-Create `.echo-state.md` in your project root with your current architectural notes, tasks, or any context you want available to the chat AI:
+Create `.echo-state.md` in your project root with current notes:
 
 ```markdown
 # Current Sprint
@@ -43,11 +64,7 @@ go mod tidy
 go run . &
 ```
 
-The daemon runs on `http://localhost:9081` and serves `GET /state`. It:
-- Watches `.echo-state.md` for changes
-- Builds the project tree (respecting `.gitignore`)
-- Reads the latest git commit from `.git/logs/HEAD`
-- If `.echo-state.md` exceeds 4000 characters, summarizes it via Ollama (`llama3.2`)
+Listens on `http://localhost:9081` — serves `GET /state` and `GET /health`.
 
 ### 3. Start the Node Relay API
 
@@ -57,64 +74,38 @@ npm install
 node index.js &
 ```
 
-The relay runs on `http://localhost:9080` and serves `GET /context`. It:
-- Fetches state from the Go daemon
-- Enforces CORS — only `https://chatgpt.com`, `https://claude.ai`, and `http://localhost:3000` are allowed
+Listens on `http://localhost:9080` — serves `GET /context`.
 
-### 4. Build and install the browser extension
+### 4. Install the browser extension
 
-```bash
-cd extension
-npm install
-npm run build
-```
-
-Load the extension from `extension/build/chrome-mv3/` into Chrome/Brave:
+Load the extension from `extension/` into Chrome/Brave:
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
-3. Click **Load unpacked** and select `extension/build/chrome-mv3/`
+3. Click **Load unpacked** and select the `extension/` directory
 
-### Startup (all at once)
-
-Install tools like `concurrently` or use a simple script:
+## Build from source
 
 ```bash
-# Terminal 1 — Daemon
-cd daemon && go run .
+# Build everything for the host platform
+make build-all
 
-# Terminal 2 — Relay API
-cd api && node index.js
+# Cross-compile the daemon for all platforms
+make build-daemon-all
 
-# Terminal 3 — Extension dev mode
-cd extension && npm run dev
+# Package the extension
+make build-extension
+
+# Full release build
+make release
 ```
 
-Or use a shell script (`start.sh`):
-
-```bash
-#!/usr/bin/env bash
-set -e
-
-echo "Starting EchoState daemon..."
-cd daemon && go run . &
-DAEMON_PID=$!
-
-echo "Starting EchoState relay API..."
-cd ../api && node index.js &
-API_PID=$!
-
-echo "EchoState running: daemon=$DAEMON_PID api=$API_PID"
-echo "Press Ctrl+C to stop."
-
-trap "kill $DAEMON_PID $API_PID 2>/dev/null; exit" INT TERM
-wait
-```
+Artifacts land in `bin/`.
 
 ## How It Works
 
 ### The injected prompt
 
-When you click **Inject Context** in the extension's floating badge, the following text is pasted into the chat textarea:
+When you click **Inject Context** in the extension's floating badge:
 
 ```
 === Summarized Context ===
@@ -143,42 +134,98 @@ If `.echo-state.md` exceeds 4000 characters:
 
 ### DOM Injection
 
-The extension uses a two-stage injection strategy:
-1. **Primary**: Dispatches a native `ClipboardEvent` with `DataTransfer` containing the formatted context
-2. **Fallback**: Directly sets the input value and dispatches an `InputEvent` (for ChatGPT: native `HTMLTextAreaElement.value` setter; for Claude: `textContent` assignment)
+The extension uses two-stage injection:
+1. **Primary**: Dispatches a native `ClipboardEvent` with `DataTransfer`
+2. **Fallback**: Sets the input value directly via `HTMLTextAreaElement.value` setter (ChatGPT) or `textContent` (Claude)
 
 ## Configuration
 
 | Variable | Default | Description |
 |---|---|---|
-| `summaryThreshold` | 4000 chars | Max `.echo-state.md` length before summarization |
+| `summaryThreshold` | 4000 chars | Max length before summarization |
 | `ollamaModel` | `llama3.2` | Ollama model for summarization |
 | `POLL_INTERVAL` | 5000 ms | Extension polling interval |
 | `RELAY_URL` | `http://localhost:9080/context` | Extension context source |
+
+## MCP (Model Context Protocol)
+
+EchoState exposes a **MCP server** via the `-mode mcp` flag, allowing local coding agents (Claude Desktop, OpenCode, Cursor, any MCP host) to call tools that return workspace context directly — no browser extension needed.
+
+### Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_workspace_context` | Returns `.echo-state.md` notes, file tree, and latest git commit |
+
+### Configuration (Claude Desktop)
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "echostate": {
+      "command": "/path/to/echostate-daemon",
+      "args": ["-mode", "mcp"]
+    }
+  }
+}
+```
+
+For other MCP hosts, configure a **stdio** transport running the same command.
+
+> **Note:** The daemon must run from a project root containing `.echo-state.md` and `.git/`. It reads these to build the workspace state.
 
 ## Project Structure
 
 ```
 .
-├── daemon/          # Go daemon (source of truth)
-│   ├── go.mod
-│   ├── main.go      # Entry point, HTTP server
-│   ├── state.go     # Thread-safe state management
-│   ├── watcher.go   # fsnotify file watcher
-│   ├── tree.go      # Project tree builder
-│   ├── git.go       # Git commit reader
-│   ├── ollama.go    # Ollama API client
-│   └── gitignore.go # .gitignore parser
-├── api/             # Node.js relay API
-│   ├── package.json
-│   └── index.js
-├── extension/       # Plasmo browser extension
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   └── src/
-│       ├── style.css
-│       └── content.tsx    # Content script (UI + injection)
+├── daemon/               # Go daemon (source of truth)
+│   ├── main.go           # Entry point, HTTP server
+│   ├── state.go          # Thread-safe state management
+│   ├── watcher.go        # fsnotify file watcher
+│   ├── tree.go           # Project tree builder
+│   ├── git.go            # Git commit reader
+│   ├── ollama.go         # Ollama API client
+│   └── gitignore.go      # .gitignore parser
+├── api/                  # Node.js relay API
+│   ├── index.js
+│   └── package.json
+├── extension/            # Vanilla JS Chrome extension (MV3)
+│   ├── manifest.json
+│   ├── content.js
+│   └── style.css
+├── scripts/              # Build & packaging scripts
+│   ├── build-daemon.sh
+│   └── package-extension.sh
+├── .github/workflows/    # CI / Release pipelines
+│   ├── ci.yml
+│   └── release.yml
+├── Makefile              # Central build entry point
 └── README.md
 ```
+
+## CI/CD
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| **CI** | Push/PR to `main` | Builds daemon, runs `go vet`, validates API syntax, packages extension |
+| **Release** | Tag `v*` | Cross-compiles daemon for 5 targets, packages extension & API, creates GitHub Release with all assets |
+
+Tag a release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+## Contributing
+
+1. Fork the repo
+2. Create a feature branch
+3. Run `make test` before committing
+4. Open a pull request
+
+## License
+
+MIT

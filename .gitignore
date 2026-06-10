@@ -17,3 +17,12 @@ daemon/echostate-daemon
 
 # Logs
 *.log
+
+# Release artifacts
+bin/
+dist/
+*.tar.gz
+*.sha256
+
+# Scripts stash
+scripts/*.zip
